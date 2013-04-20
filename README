@@ -29,5 +29,3 @@ If there are any errors, please email me.
 4. All compiled executables are located in build/, so you can run them as this:
 
 build/http-proxy
-
-============All above are TA's introduction==================
