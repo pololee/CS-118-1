@@ -1,12 +1,20 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
+/** @file http-proxy.cc
+*@author Xiao Li (pololee@cs.ucla.edu)
+*@data 2013/4/26
+*/
 
 #include <iostream>
+<<<<<<< HEAD
 #include <string>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
 
+=======
+#include "http-common.h"
+>>>>>>> 598a18f9465f283e2e50ef5731b10fb6b560ab4c
 using namespace std;
 
 int get_data(string hostname, string &result_buffer)
@@ -55,9 +63,17 @@ int get_data(string hostname, string &result_buffer)
 
 int main (int argc, char *argv[])
 {
+<<<<<<< HEAD
     //test get pages
     string res;
     get_data("www.ucla.edu",res);
     cout<<res<<endl;
+=======
+  // command line parsing
+  cout<<"hello, world!"<<endl;
+  int proxySockFD = iniServerListen(PROXY_SERVER_PORT);
+	cout<<"finish listen\n";
+	cout<<"proxySockFD: "<<proxySockFD<<endl;
+>>>>>>> 598a18f9465f283e2e50ef5731b10fb6b560ab4c
   return 0;
 }
