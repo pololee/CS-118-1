@@ -5,16 +5,13 @@
 */
 
 #include <iostream>
-<<<<<<< HEAD
 #include <string>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
+// #include "http-common.h"
 
-=======
-#include "http-common.h"
->>>>>>> 598a18f9465f283e2e50ef5731b10fb6b560ab4c
 using namespace std;
 
 int get_data(string hostname, string &result_buffer)
@@ -27,7 +24,7 @@ int get_data(string hostname, string &result_buffer)
     memset(&hints,0,sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
-    int status = getaddrinfo(hostname, "http", &hints, &res );
+    int status = getaddrinfo(hostname.c_str(), "http", &hints, &res );
     if (status !=0)
     {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
@@ -63,17 +60,14 @@ int get_data(string hostname, string &result_buffer)
 
 int main (int argc, char *argv[])
 {
-<<<<<<< HEAD
     //test get pages
     string res;
     get_data("www.ucla.edu",res);
     cout<<res<<endl;
-=======
   // command line parsing
   cout<<"hello, world!"<<endl;
-  int proxySockFD = iniServerListen(PROXY_SERVER_PORT);
-	cout<<"finish listen\n";
-	cout<<"proxySockFD: "<<proxySockFD<<endl;
->>>>>>> 598a18f9465f283e2e50ef5731b10fb6b560ab4c
+  //int proxySockFD = iniServerListen(PROXY_SERVER_PORT);
+	//cout<<"finish listen\n";
+	//cout<<"proxySockFD: "<<proxySockFD<<endl;
   return 0;
 }
