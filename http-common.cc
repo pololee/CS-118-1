@@ -89,10 +89,11 @@ int iniServerListen(const char *port)
     return -2;
   }
 
-	cout<<"p: "<<p<<endl;
 	char s[INET6_ADDRSTRLEN];
-  inet_ntop(p->ai_family, getIPAddr((struct sockaddr *)p->ai_addr), s, sizeof s);
-  fprintf(stderr, "client: connecting to %s\n", s);
+   inet_ntop(p->ai_family, getIPAddr((struct sockaddr *)p->ai_addr), s, sizeof s);
+   printf("proxy IP: %s\n", s);
+    printf("proxy Port: %s\n", port);
+    
   // Don't need the structure with address info any more
   freeaddrinfo(res);
 
@@ -102,9 +103,12 @@ int iniServerListen(const char *port)
     perror("listen");
     exit(1);
   }
-	
+
+	cout<<"Start listening"<<endl;
   return sock_fd;
 }
+
+
 
 int clientConnectToRemote(const char *host,const char *port)
 {
