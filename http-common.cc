@@ -1,23 +1,24 @@
-/**@file http-common.h
+  /**@file http-common.h
 * common functions and common parameters
 * void *getIPAddr(struct sockaddr *sa);
-	return IP address(IPv4 or IPv6)
+	 return IP address(IPv4 or IPv6)
 * int iniServerListen(const char *port);
-	Brief: create socket, bind it to port, listen
-	return fileDescriptor of the socket, otherwise return <0
+	 Brief: create socket, bind it to port, listen
+	 return fileDescriptor of the socket, otherwise return <0
 * int clientConnectToRemote(const char *host, const char *port);
-	Brief: create socket, connect to remote host
-	return fileDescri
+	 Brief: create socket, connect to remote host
+	 return fileDescri
 * int getDatafromHost(int remoteFD, std::string &result);
-	Brief: Get All data from remote host
-	return 0 if success, otherwise return <0
+	 Brief: Get All data from remote host
+	 return 0 if success, otherwise return <0
 *@author Xiao Li (pololee@cs.ucla.edu)
 *@data 2013/4/26
 */
 
 #include "http-common.h"
-
 using namespace std;
+
+#define COMMON_DEBUG
 
 void *getIPAddr(struct sockaddr *sa)
 {
@@ -52,7 +53,7 @@ int iniServerListen(const char *port)
   {
     // Create the socket
     sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-    if (sock_fd < 0)
+    if (sock_fd == -1)
     {
       perror("server: cannot open socket");
       continue;
@@ -71,7 +72,7 @@ int iniServerListen(const char *port)
     // Bind the socket to the port
 		// associate a socket with an IP address and port number
     int bind_status = bind(sock_fd, p->ai_addr, p->ai_addrlen);
-    if (bind_status != 0)
+    if (bind_status == -1)
     {
       close(sock_fd);
       perror("server: Cannot bind socket");
@@ -91,8 +92,11 @@ int iniServerListen(const char *port)
 
 	char s[INET6_ADDRSTRLEN];
    inet_ntop(p->ai_family, getIPAddr((struct sockaddr *)p->ai_addr), s, sizeof s);
+
+#ifdef COMMON_DEBUG
    printf("proxy IP: %s\n", s);
-    printf("proxy Port: %s\n", port);
+   printf("proxy Port: %s\n", port);
+#endif
     
   // Don't need the structure with address info any more
   freeaddrinfo(res);
@@ -103,8 +107,10 @@ int iniServerListen(const char *port)
     perror("listen");
     exit(1);
   }
-
-	cout<<"Start listening"<<endl;
+#ifdef COMMON_DEBUG
+  cout<<"-------------------------------------------"<<endl;
+	cout<<"Start listening, waiting for connections..."<<endl;
+#endif
   return sock_fd;
 }
 
@@ -159,8 +165,11 @@ int clientConnectToRemote(const char *host,const char *port)
 
   char s[INET6_ADDRSTRLEN];
   inet_ntop(p->ai_family, getIPAddr((struct sockaddr *)p->ai_addr), s, sizeof s);
-  fprintf(stderr, "client: connecting to %s\n", s);
-
+  // fprintf(stderr, "client: connecting to %s\n", s);
+  #ifdef COMMON_DEBUG
+  printf("proxy: connecting to %s\n", s);
+  cout<<"proxy: connecting to port "<<port<<endl;
+  #endif
   // Don't need the structure with address info any more
   freeaddrinfo(res);
 
@@ -182,8 +191,15 @@ int getDatafromHost(int remoteFD, string &result)
 		{
 			break;
 		}
+    #ifdef COMMON_DEBUG
+    cout<<"byte number: "<<numRecv<<endl;
+    #endif
 		result.append(recvBuf, numRecv);
 	}
+
+  #ifdef COMMON_DEBUG
+  cout<<"exit from getDatafromHost()"<<endl;
+  #endif
 	return 0;
 }
 

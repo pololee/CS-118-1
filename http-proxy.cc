@@ -48,6 +48,7 @@ int main (int argc, char *argv[])
         //Accept connection
         int clientFD = accept(proxySockFD, (struct sockaddr *)&their_addr, &sin_size);
 #ifdef DEBUG
+        cout<<"----------------Request from client-----------------"<<endl;
         cout<<"clientFD: "<<clientFD<<endl;
 #endif
         if (clientFD == -1) {
@@ -83,9 +84,12 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
             perror("recv");
             return -1;
         }
-        cout<<"receive some thing"<<endl;
         clientBuffer.append(buf);
     }
+
+    #ifdef DEBUG
+    cout<<"client request: "<<clientBuffer<<endl;
+    #endif
     
     //Parse request from client
     HttpRequest clientReq;
@@ -93,11 +97,11 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
         clientReq.ParseRequest(clientBuffer.c_str(), clientBuffer.length());
     } catch (ParseException ex)
     {
-        fprintf(stderr, "Exception raised: %s\n", ex.what());
+        printf("Exception raised: %s\n", ex.what());
         string clientResponse = "HTTP/1.1";
         
         string cmp = "Request is not GET";
-        if (strcmp(ex.what(), cmp.c_str())) {
+        if (strcmp(ex.what(), cmp.c_str()) != 0) {
             clientResponse += " 400 Bad Request\r\n\r\n";
         }
         else{
@@ -123,6 +127,9 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
         remoteHost = clientReq.GetHost();
     }
     
+    #ifdef DEBUG
+    cout<<"remoteHost: "<<remoteHost<<endl;
+    #endif
     //----------------Go to get a response to the request--------------------
     //=====First check cache=======
     string remoteResponse;
@@ -130,6 +137,11 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
     CacheTable::iterator it = cacheTable->find(fullPath);
     if (it != cacheTable->end()) {
         remoteResponse = it->second;
+
+        #ifdef DEBUG
+        cout<<"Found local cache"<<endl;
+        cout<<"response: "<<it->second<<endl;
+        #endif
     }
     else{
         
@@ -138,6 +150,12 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
         
         //connect to remote host
         int remoteFD = clientConnectToRemote(remoteHost.c_str(), REMOTE_SERVER_PORT);
+
+        #ifdef DEBUG
+        cout<<"remoteFD: "<<remoteFD<<endl;
+        cout<<"remote connection port: "<<REMOTE_SERVER_PORT<<endl;
+        #endif
+
         if (remoteFD < 0) {
             fprintf(stderr, "Cannot make a connection to a remote host %s on port %s\n", remoteHost.c_str(), REMOTE_SERVER_PORT);
             free(remoteReq);
@@ -151,21 +169,28 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
             close(remoteFD);
             return -1;
         }
-        
+        #ifdef DEBUG
+        cout<<"proxy send request to remote host"<<endl;
+        #endif
         //get data from remote host into remoteResponse(string)
         if (getDatafromHost(remoteFD, remoteResponse) != 0 ) {
             free(remoteReq);
             close(remoteFD);
             return -1;
         }
-        
+
+        #ifdef DEBUG
+        cout<<"get data from remote host"<<endl;
+        // cout<<"response: "<<remoteResponse<<endl;
+        #endif
+
         //Add to the cacheTable if Cache-Control is not private
-        if(strstr(remoteResponse.c_str(), "Cache-Control: private") == NULL)
-        {
+        // if(strstr(remoteResponse.c_str(), "Cache-Control: private") == NULL)
+        // {
             pthread_mutex_lock(mutex);
             cacheTable->insert(pair<string, string>(fullPath, remoteResponse));
             pthread_mutex_unlock(mutex);
-        }
+        // }
 
         close(remoteFD);
     }
@@ -178,6 +203,10 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
         return 0;
     }
     
+    #ifdef DEBUG
+    cout<<"proxy send response to client"<<endl;
+    #endif
+
     free(remoteReq);
     return 0;
 }
