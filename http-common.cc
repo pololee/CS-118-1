@@ -168,7 +168,6 @@ int clientConnectToRemote(const char *host,const char *port)
   // fprintf(stderr, "client: connecting to %s\n", s);
   #ifdef COMMON_DEBUG
   printf("proxy: connecting to %s\n", s);
-  cout<<"proxy: connecting to port "<<port<<endl;
   #endif
   // Don't need the structure with address info any more
   freeaddrinfo(res);
@@ -191,15 +190,9 @@ int getDatafromHost(int remoteFD, string &result)
 		{
 			break;
 		}
-    #ifdef COMMON_DEBUG
-    cout<<"byte number: "<<numRecv<<endl;
-    #endif
 		result.append(recvBuf, numRecv);
 	}
 
-  #ifdef COMMON_DEBUG
-  cout<<"exit from getDatafromHost()"<<endl;
-  #endif
 	return 0;
 }
 

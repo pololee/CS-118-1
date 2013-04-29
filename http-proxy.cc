@@ -5,6 +5,7 @@
 */
 
 #include "http-proxy.h"
+#include <boost/lexical_cast.hpp>
 
 //@Brief: deal with communication between client and proxy
 //      Get the request from client
@@ -37,6 +38,7 @@ int main (int argc, char *argv[])
     pthread_mutex_init(&cacheMutex, NULL);
 #ifdef DEBUG
     cout<<"initialized cache!"<<endl;
+    cout<<endl;
 #endif
     
     //Loop to accept the request
@@ -67,6 +69,7 @@ int main (int argc, char *argv[])
         
         pthread_t threadID;
         pthread_create(&threadID, NULL, pthread_ClientToProxy, (void *)params);
+        cout<<"what happened!!!"<<endl;
     }
     
     
@@ -86,10 +89,6 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
         }
         clientBuffer.append(buf);
     }
-
-    #ifdef DEBUG
-    cout<<"client request: "<<clientBuffer<<endl;
-    #endif
     
     //Parse request from client
     HttpRequest clientReq;
@@ -140,7 +139,6 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
 
         #ifdef DEBUG
         cout<<"Found local cache"<<endl;
-        cout<<"response: "<<it->second<<endl;
         #endif
     }
     else{
@@ -149,11 +147,15 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
         //the Proxy needs to send a request to the remote host and give back the data to client
         
         //connect to remote host
-        int remoteFD = clientConnectToRemote(remoteHost.c_str(), REMOTE_SERVER_PORT);
+        
+        string remotePort = boost::lexical_cast<string> (clientReq.GetPort());
+#ifdef DEBUG
+        cout<<"remote Port: "<<remotePort<<endl;
+#endif
+        int remoteFD = clientConnectToRemote(remoteHost.c_str(), remotePort.c_str() );
 
         #ifdef DEBUG
         cout<<"remoteFD: "<<remoteFD<<endl;
-        cout<<"remote connection port: "<<REMOTE_SERVER_PORT<<endl;
         #endif
 
         if (remoteFD < 0) {
@@ -170,7 +172,7 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
             return -1;
         }
         #ifdef DEBUG
-        cout<<"proxy send request to remote host"<<endl;
+        cout<<"PROXY send request to remote host"<<endl;
         #endif
         //get data from remote host into remoteResponse(string)
         if (getDatafromHost(remoteFD, remoteResponse) != 0 ) {
@@ -204,7 +206,7 @@ int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
     }
     
     #ifdef DEBUG
-    cout<<"proxy send response to client"<<endl;
+    cout<<"PROXY send response to CLIENT"<<endl;
     #endif
 
     free(remoteReq);
@@ -222,56 +224,3 @@ void * pthread_ClientToProxy(void * params)
     
     return NULL;
 }
-// #include <iostream>
-// #include <string>
-// #include <sys/types.h>
-// #include <sys/socket.h>
-// #include <netdb.h>
-// #include <netinet/in.h>
-// // #include "http-common.h"
-
-// using namespace std;
-
-// int get_data(string hostname, string &result_buffer)
-// {
-//     struct addrinfo hints;
-//     struct addrinfo *res;
-//     char buf[256];
-//     int byte_count;
-    
-//     memset(&hints,0,sizeof hints);
-//     hints.ai_family = AF_UNSPEC;
-//     hints.ai_socktype = SOCK_STREAM;
-//     int status = getaddrinfo(hostname.c_str(), "http", &hints, &res );
-//     if (status !=0)
-//     {
-//         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-//         exit(1);
-//     }
-//     int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-//     connect(sockfd, res->ai_addr, res->ai_addrlen);
-//     //char hostname[NI_MAXHOST] = "";
-//     //int error = getnameinfo(res->ai_addr, res->ai_addrlen, hostname, NI_MAXHOST, NULL, 0,0);
-//     //if (error !=0)
-//     //{
-//     //    fprintf(stderr, "error in getnameinfo: %s\n", gai_strerror(error));
-//     //}
-//     //if (hostname!='\0')
-//     //    printf("hostname: %s\n", hostname);
-//     while(true)
-//     {
-//         byte_count = recv(sockfd, buf, sizeof buf, 0);
-//         cout<<byte_count<<endl;
-//         if (byte_count<0)
-//         {
-//             perror("recv");
-//             return -1;
-//         }
-//         else if (byte_count==0)
-//         {
-//             break;
-//         }
-//         result_buffer.append(buf,byte_count);
-//     }
-//     return 0;
-// }
