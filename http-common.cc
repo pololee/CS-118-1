@@ -175,9 +175,41 @@ int clientConnectToRemote(const char *host,const char *port)
   return sock_fd;
 }
 
+int getContentLength(string & response)
+{
+    unsigned found = response.find("Content-Length:");
+ //   if (found != std::string::npos)
+   // {
+     //   cout<<"Cannot get content length based on server response"<<endl;
+       // return -1;
+    //}
+    int pos = (int) found;
+    string num = response.substr(pos+15);
+    cout<<num<<endl;
+    stringstream ss(num);
+    int res = 0;
+    ss>>res;
+    cout<<res<<endl;
+    return res;
+    
+
+}
+
 int getDatafromHost(int remoteFD, string &result)
 {
-	while(true)
+    string recbuf;
+    while (memmem(recbuf.c_str(), recbuf.length(), "\r\n\r\n", 4) == NULL) {
+        char buf[BUFSIZE];
+        if (recv(remoteFD, buf, sizeof(buf), 0) < 0) {
+            perror("recv");
+            return -1;
+        }
+        recbuf.append(buf);
+    }
+    int content_length = getContentLength(recbuf);
+    int curr_length = 0;
+    result += recbuf;
+	while(curr_length < content_length)
 	{
 		char recvBuf[BUFSIZE];
 		int numRecv = recv(remoteFD, recvBuf, sizeof(recvBuf), 0);
@@ -190,6 +222,7 @@ int getDatafromHost(int remoteFD, string &result)
 		{
 			break;
 		}
+        curr_length += numRecv;
 		result.append(recvBuf, numRecv);
 	}
 

@@ -21,6 +21,7 @@ void * pthread_ClientToProxy(void * params);
 
 int main (int argc, char *argv[])
 {
+
     //Create proxy server and make it listen
     int proxySockFD = iniServerListen(PROXY_SERVER_PORT);
 #ifdef DEBUG
@@ -78,6 +79,7 @@ int main (int argc, char *argv[])
 
 int clientToProxy(int clientFD,CacheTable *cacheTable,pthread_mutex_t *mutex)
 {
+    
     //Get the request from client
     cout<<"------------------client To Proxy---------------------"<<endl;
 	 string clientBuffer;

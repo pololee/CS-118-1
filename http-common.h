@@ -7,7 +7,7 @@
 // C++ Libraries
 #include <iostream>
 #include <string>
-
+#include <sstream>
 // C Libraries
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +19,7 @@
 // C Network/Socket Libraries
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -31,4 +32,5 @@
 void *getIPAddr(struct sockaddr *sa);
 int iniServerListen(const char *port);
 int clientConnectToRemote(const char *host, const char *port);
+int getContentLength(std::string & response);
 int getDatafromHost(int remoteFD, std::string &result);
