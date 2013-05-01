@@ -38,7 +38,7 @@ int iniServerListen(const char *port)
   hints.ai_family = AF_UNSPEC; //(either IPv4 or IPv6)
   hints.ai_socktype = SOCK_STREAM; 
   hints.ai_flags = AI_PASSIVE; //return socket addresses will be suitable for bind()
-
+  
   addr_status = getaddrinfo(NULL, port, &hints, &res);
   if (addr_status != 0)
   {
@@ -124,7 +124,6 @@ int clientConnectToRemote(const char *host,const char *port)
   memset(&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
-
   //fprintf(stderr, "%s %s\n", host, port);
   int addr_status = getaddrinfo(host, port, &hints, &res);
   if (addr_status != 0)
