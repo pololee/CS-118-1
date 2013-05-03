@@ -73,6 +73,7 @@ class ClientThread (Thread):
                 self.result = True
             self.data = rdata
             conn.close()
+            print("self.file connection close")
             dataFile.close()
         else:
             conn = HTTPConnection(self.proxy)
@@ -83,6 +84,7 @@ class ClientThread (Thread):
             if resp.status == httplib.OK:
                 self.result = True
             conn.close()
+            print("connection close")
 
 class ClientPersistThread(Thread):
     def __init__(self, proxy, url, file, url2, file2):
@@ -114,6 +116,7 @@ class ClientPersistThread(Thread):
 
         connHdrs = {"Connection": "close"}
         conn.request("GET", self.url2, headers=connHdrs)
+        print("close header")
 
         resp = conn.getresponse()
         rdata2 = resp.read()
@@ -156,7 +159,7 @@ client1 = ClientThread("127.0.0.1:" + pport, "http://127.0.0.1:" + sport1 + "/ba
 client1.start()
 client1.join()
 if client1.result:
-    print "Basic object fetching: [" + bcolors.PASS + "PASSED" + bcolors.ENDC + "]" 
+    print "Basic object fetching: [" + bcolors.PASS + "PASSED" + bcolors.ENDC + "]"
 else: 
     print "Basic object fetching: [" + bcolors.FAIL + "FAILED" + bcolors.ENDC + "]" 
 
