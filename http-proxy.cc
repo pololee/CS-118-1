@@ -89,9 +89,9 @@ int main (int argc, char *argv[])
         //when more than MAXIMUM_PROCESS clients ask request,
         //suspend until someone finish
         pthread_mutex_lock(&count_mutex);
-        while (threadCount >= MAXIMUM_PROCESS) {
-            pthread_cond_wait(&count_threshold, &count_mutex);
-        }
+//        if(threadCount >= MAXIMUM_PROCESS) {
+//            pthread_cond_wait(&count_threshold, &count_mutex);
+//        }
         pthread_mutex_unlock(&count_mutex);
         
         struct sockaddr_storage their_addr;
@@ -113,9 +113,11 @@ int main (int argc, char *argv[])
 #endif
         
         //Create thread
+        TRACE("COUNT_MUTEX");
         pthread_mutex_lock(&count_mutex);
         threadCount++;
         TRACE("CREATE THREAD "<<threadCount);
+        TRACE("COUNT_MUTEX");
         pthread_mutex_unlock(&count_mutex);
         
         pthread_t clientThread;
@@ -192,6 +194,9 @@ int iniServerListen(const char *port)
     
 #ifdef DEBUG
     printf("proxy Port: %s\n", port);
+    char s[INET6_ADDRSTRLEN];
+    inet_ntop(p->ai_family, getIPAddr((struct sockaddr *)p->ai_addr), s, sizeof s);
+    fprintf(stderr, "listener bind to %s\n", s);
 #endif
     
     // Don't need the structure with address info any more
@@ -255,8 +260,9 @@ void* clientToProxy(void * sock)
                     break;
                 }
             }
-            TRACE("rece size: "<<size_recv);
+            TRACE("request recv size: "<<size_recv);
             if(size_recv == 0){ //the other side close the connection
+                TRACE("the other side close connection "<<clientFD);
                     break;
             }
            
@@ -268,6 +274,7 @@ void* clientToProxy(void * sock)
             HttpRequest clientReq;
             clientReq.ParseRequest(clientBuffer.c_str(), clientBuffer.length());
             TRACE("******************Request***********************");
+            TRACE("clientFD"<<clientFD);
             unsigned long headerTail = clientBuffer.find("\r\n\r\n", 0);
             TRACE(clientBuffer.substr(0, headerTail));
             TRACE("******************Request***********************");
@@ -322,11 +329,11 @@ void* clientToProxy(void * sock)
     TRACE("close client socket "<<clientFD);
     pthread_mutex_lock(&count_mutex);
     threadCount--;
-    TRACE("After kill THREAD "<<threadCount);
-    if (threadCount < MAXIMUM_PROCESS) {
-            pthread_cond_signal(&count_threshold);
-    }
+//    if (threadCount < MAXIMUM_PROCESS) {
+//            pthread_cond_signal(&count_threshold);
+//    }
     pthread_mutex_unlock(&count_mutex);
+    TRACE("After kill THREAD "<<threadCount);
     pthread_exit(NULL);
     TRACE("++++++++++++++Close Client++++++++++++++++");
 }
@@ -346,6 +353,7 @@ string getResponse(HttpRequest req)
     TRACE("url is "<<url);
     TRACE("try to get from cache");
     
+    TRACE("CASHE_MUTEX");
     pthread_mutex_lock(&cache_mutex);
     
     Webpage* pg = cache.get(url);
@@ -355,6 +363,7 @@ string getResponse(HttpRequest req)
             TRACE("webpage in cahce, not expired");
             string d = pg->getData();
             
+            TRACE("CASHE_MUTEX");
             pthread_mutex_unlock(&cache_mutex);
             return d;
         }
@@ -363,11 +372,13 @@ string getResponse(HttpRequest req)
                 TRACE("try to use last modify");
                 req.AddHeader("If-Modified-Since", pg->getLastModify());
             }
+            TRACE("CASHE_MUTEX");
             pthread_mutex_unlock(&cache_mutex);
             return fetchResponse(req);
         }
     }
     else{
+        TRACE("CASHE_MUTEX");
         pthread_mutex_unlock(&cache_mutex);
         TRACE("directly fetch");
         return fetchResponse(req);
@@ -422,8 +433,10 @@ string fetchResponse(HttpRequest req){
             if((expire_t = convertTime(expire))!=0 && difftime(expire_t, now)>0){
                 TRACE("add to cache with normal expire");
                 Webpage pg(expire_t, lastModi, data);
+                TRACE("CASHE_MUTEX");
                 pthread_mutex_lock(&cache_mutex);
                 cache.add(url, pg);
+                TRACE("CASHE_MUTEX");
                 pthread_mutex_unlock(&cache_mutex);
             }
             else{
@@ -527,6 +540,7 @@ string getDatafromHost(int remoteFD, HttpResponse* response)
     
     long contentLeft = 0;
     while ((recvSize = recv(remoteFD, bufTemp, BUFSIZE, 0)) > 0) {
+        TRACE("Rece from remote recvsize: "<<recvSize);
         recvBuf.append(bufTemp, recvSize);
         
         string body;
