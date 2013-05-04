@@ -7,7 +7,8 @@
 #include "http-proxy.h"
 using namespace std;
 
-#define DEBUG 1
+//#define DEBUG 1
+#define MOREDEBUG 1
 
 #ifdef DEBUG
 #define TRACE(x) cout<<x<<endl
@@ -24,16 +25,17 @@ pthread_mutex_t count_mutex;
 pthread_cond_t count_threshold;
 pthread_mutex_t cache_mutex;
 int threadCount;
-#define PROXY_SERVER_PORT "48670"
-#define REMOTE_SERVER_PORT "80"
+#define PROXY_SERVER_PORT 48670
+#define REMOTE_SERVER_PORT 80
 #define BACKLOG 100
 #define BUFSIZE 2048
+#define PROXY_LISTEN_IP "127.0.0.1"
 
 
 //---------------------------Declaration of Functions-----------------------------------
 //@brief:Similar to the example in Beej's Guide to Networking Programming
 //      return the listening Socket
-int iniServerListen(const char *port);
+int iniServerListen();
 
 //@Brief: deal with communication between client and proxy
 //      Get the request from client
@@ -49,20 +51,29 @@ string fetchResponse(HttpRequest req);
 
 //@brief: Make connection to Remote
 //      return the socket
-int proxyConnectToRemote(const char *host,const char *port);
+int proxyConnectToRemote(const char *ip, const unsigned short port);
 
 //@brief: Get Data from the remote host
 string getDatafromHost(int remoteFD, HttpResponse* response);
 
 
-//@brief: Get the IP address
-void *getIPAddr(struct sockaddr *sa);
+/**
+ * @brief convert hostname to ip address
+ * @TODO if cannot resolve host, what will happen?
+ *
+ * @param hostname
+ * @return ip address
+ */
+char * get_ip(const char * host);
 
 //@brief:Convert a string to Time
 time_t convertTime(string s);
 
 //@brief: Create a Error msg
 HttpResponse createErrorMsg(string reason);
+
+//@brief: Create a TCP socket
+int createTCPSocket();
 
 
 
@@ -77,9 +88,9 @@ int main (int argc, char *argv[])
     pthread_mutex_init(&cache_mutex, NULL);
     
     //Create proxy server and make it listen
-    int proxySockFD = iniServerListen(PROXY_SERVER_PORT);
+    int proxySockFD = iniServerListen();
     if (proxySockFD < 0) {
-        fprintf(stderr, "Cannot make proxy server listen on port %s\n", PROXY_SERVER_PORT);
+        fprintf(stderr, "Cannot make proxy server listen on port %d\n", PROXY_SERVER_PORT);
         return 1;
     }
     
@@ -94,22 +105,30 @@ int main (int argc, char *argv[])
 //        }
         pthread_mutex_unlock(&count_mutex);
         
-        struct sockaddr_storage their_addr;
-        char ipAddr[INET6_ADDRSTRLEN];
-        socklen_t sin_size = sizeof(their_addr);
+        struct sockaddr_in cli_addr;
+        socklen_t len = sizeof(cli_addr);
         
         //Accept connection
-        int clientFD = accept(proxySockFD, (struct sockaddr *)&their_addr, &sin_size);
-        if (clientFD == -1) {
+        int* clientFD = new int;
+        *clientFD = accept(proxySockFD, (struct sockaddr *)&cli_addr, &len);
+        if (*clientFD == -1) {
             perror("accept");
             continue;
         }
         
-#ifdef DEBUG
-        cout<<"++++++++++New Client++++++++++++++++++"<<endl;
-        cout<<"clientFD: "<<clientFD<<endl;
-        inet_ntop(their_addr.ss_family, getIPAddr((struct sockaddr *)&their_addr), ipAddr, sizeof(ipAddr));
-        printf("Proxy: got connection from %s\n", ipAddr);
+        int yes = 1;
+        int opt_status = setsockopt(*clientFD, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+        if (opt_status == -1)
+        {
+            perror("server: setsockopt");
+            exit(1);
+        }
+        
+#ifdef MOREDEBUG
+        cout<<"New Client ";
+        cout<<"clientFD: "<<*clientFD<<endl;
+//        inet_ntop(their_addr.ss_family, getIPAddr((struct sockaddr *)&their_addr), ipAddr, sizeof(ipAddr));
+//        printf("Proxy: got connection from %s\n", ipAddr);
 #endif
         
         //Create thread
@@ -121,7 +140,7 @@ int main (int argc, char *argv[])
         pthread_mutex_unlock(&count_mutex);
         
         pthread_t clientThread;
-        pthread_create(&clientThread, NULL, clientToProxy, (void *)&clientFD);
+        pthread_create(&clientThread, NULL, clientToProxy, (void *)clientFD);
     }
     close(proxySockFD);
     return 0;
@@ -131,88 +150,40 @@ int main (int argc, char *argv[])
 
 
 
-int iniServerListen(const char *port)
+int iniServerListen()
 {
-	struct addrinfo hints, *res;
-	int addr_status;
-    
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC; //(either IPv4 or IPv6)
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE; //return socket addresses will be suitable for bind()
-    
-    addr_status = getaddrinfo(NULL, port, &hints, &res);
-    if (addr_status != 0)
+	int sock_listen = createTCPSocket();
+    int yes = 1;
+    int opt_status = setsockopt(sock_listen, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+    if (opt_status == -1)
     {
-        fprintf(stderr, "Cannot get info\n");
-        return -1;
-    }
-    
-    // Loop through results, connect to first one we can
-    struct addrinfo *p;
-	int sock_fd;
-    for (p = res; p != NULL; p = p->ai_next)
-    {
-        // Create the socket
-        sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (sock_fd == -1)
-        {
-            perror("server: cannot open socket");
-            continue;
-        }
-        
-        // Set socket options
-		// set SO_REUSEADDR on a socket to true(1)
-        int yes = 1;
-        int opt_status = setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
-        if (opt_status == -1)
-        {
-            perror("server: setsockopt");
-            exit(1);
-        }
-        
-        // Bind the socket to the port
-		// associate a socket with an IP address and port number
-        int bind_status = bind(sock_fd, p->ai_addr, p->ai_addrlen);
-        if (bind_status == -1)
-        {
-            close(sock_fd);
-            perror("server: Cannot bind socket");
-            continue;
-        }
-        
-        // Bind the first one we can
-        break;
-    }
-    
-	// No binds happened
-    if (p == NULL)
-    {
-        fprintf(stderr, "server: failed to bind\n");
-        return -2;
-    }
-    
-#ifdef DEBUG
-    printf("proxy Port: %s\n", port);
-    char s[INET6_ADDRSTRLEN];
-    inet_ntop(p->ai_family, getIPAddr((struct sockaddr *)p->ai_addr), s, sizeof s);
-    fprintf(stderr, "listener bind to %s\n", s);
-#endif
-    
-    // Don't need the structure with address info any more
-    freeaddrinfo(res);
-    
-    // Start listening
-    // BACKLOG: the number of connections allowed on the incoming queue
-    if (listen(sock_fd, BACKLOG) == -1) {
-        perror("listen");
+        perror("server: setsockopt");
         exit(1);
     }
-#ifdef DEBUG
+    struct sockaddr_in serv_addr;
+    serv_addr.sin_family = AF_INET;
+    inet_aton(PROXY_LISTEN_IP, &serv_addr.sin_addr);
+    serv_addr.sin_port = htons(PROXY_SERVER_PORT);
+    if((bind(sock_listen, (struct sockaddr*)&serv_addr, sizeof(serv_addr)))<0){
+        cerr<<"ERROR on binding"<<endl;
+        exit(1);
+    }
+    TRACE("bind successful")
+    if(listen(sock_listen,BACKLOG)<0){
+        cerr<<"ERROR on listening"<<endl;
+        exit(1);
+    }
+    TRACE("listen succesful")
+    
+#ifdef MOREDEBUG
+    printf("proxy Port: %d\n", PROXY_SERVER_PORT);
+#endif
+
+#ifdef MOREDEBUG
 	cout<<"Start listening, waiting for connections..."<<endl;
     cout<<"-----------------------------------------------------------------------"<<endl;
 #endif
-    return sock_fd;
+    return sock_listen;
 }
 
 
@@ -224,7 +195,7 @@ void* clientToProxy(void * sock)
     //If there is no request beyond 60 seconds, the proxy will close the connection to client
     int clientFD = *((int*)sock);
     struct timeval timeout;
-    timeout.tv_sec = 4;
+    timeout.tv_sec = 2;
     timeout.tv_usec = 0;
     
     fd_set fds;
@@ -234,7 +205,7 @@ void* clientToProxy(void * sock)
     int rc;
     while ((rc=select(clientFD+1, &fds, NULL, NULL, &timeout)) != 0)
     {
-        TRACE("TIMEOUT "<<timeout.tv_sec<<"+"<<timeout.tv_usec);
+        TRACE("TIMER "<<timeout.tv_sec<<"+"<<timeout.tv_usec);
         TRACE("select rc: "<<rc);
         if (rc < 0)
         {
@@ -252,7 +223,7 @@ void* clientToProxy(void * sock)
             ssize_t size_recv;
             while((size_recv = recv(clientFD, bufTemp, BUFSIZE,0)) > 0){
 //                TRACE("message received is "<<bufTemp);
-                //TRACE("size recieved is "<<size_recv)
+                //TRACE("size recieved is "<<size_recv);
                 
                 clientBuffer.append(bufTemp,size_recv);
                 
@@ -273,20 +244,25 @@ void* clientToProxy(void * sock)
             
             HttpRequest clientReq;
             clientReq.ParseRequest(clientBuffer.c_str(), clientBuffer.length());
-            TRACE("******************Request***********************");
+            
+#ifdef MOREDEBUG
+            cout<<"******************Request***********************"<<endl;
             TRACE("clientFD"<<clientFD);
             unsigned long headerTail = clientBuffer.find("\r\n\r\n", 0);
-            TRACE(clientBuffer.substr(0, headerTail));
-            TRACE("******************Request***********************");
-            
-            
+            cout<<clientBuffer.substr(0, headerTail)<<endl;
+            cout<<"***********************************************"<<endl;
+#endif
             //Get Response
             const char * data;
             try {
                 string rsp = getResponse(clientReq);
                 data = rsp.c_str();
-                TRACE("DATA received, forward to the client");
+                cout<<"@@DATA received, forward to the client clientFD "<<clientFD<<endl;
                 send(clientFD, data, strlen(data), 0);
+//                string clientAskClose = clientReq.FindHeader("Connection");
+//                if (strcmp("close", clientAskClose.c_str()) != 0) {
+//                    break;
+//                }
             }
             catch (ParseException ex) {
                 TRACE("Parse Exception for RESPONSE");
@@ -325,6 +301,11 @@ void* clientToProxy(void * sock)
             TRACE("unexpexted exception "<<ex.what());
         }
     }
+
+#ifdef MOREDEBUG
+    cout<<"!!!finish everything, will close fd and exit thread clientFD "<<clientFD<<endl<<endl;
+#endif
+    
     close(clientFD);
     TRACE("close client socket "<<clientFD);
     pthread_mutex_lock(&count_mutex);
@@ -335,7 +316,6 @@ void* clientToProxy(void * sock)
     pthread_mutex_unlock(&count_mutex);
     TRACE("After kill THREAD "<<threadCount);
     pthread_exit(NULL);
-    TRACE("++++++++++++++Close Client++++++++++++++++");
 }
 
 
@@ -350,7 +330,7 @@ string getResponse(HttpRequest req)
     string url = ss.str();
     
     //Try to get it from cache
-    TRACE("url is "<<url);
+    cout<<"url is "<<url<<" ";
     TRACE("try to get from cache");
     
     TRACE("CASHE_MUTEX");
@@ -395,12 +375,17 @@ string fetchResponse(HttpRequest req){
     
     //PROXY connect to REMOTE HOST
     const char* host = (req.GetHost()).c_str();
-    const string port = boost::lexical_cast<string> (req.GetPort());
-    int sockFetch = proxyConnectToRemote(host, port.c_str());
+    unsigned short port = htons(req.GetPort());
+    char* ip = get_ip(host);
+    int sockFetch = proxyConnectToRemote(ip, port);
     if(sockFetch<0){
       	throw HttpException("502", "Bad Gateway");
     }
     TRACE("Connection established");
+    
+#ifdef MOREDEBUG
+    cout<<"~~~Get data from server remoteFD "<<sockFetch<<endl;
+#endif
     
     //construct request and send it to remote host
     size_t size_req = req.GetTotalLength();
@@ -458,69 +443,49 @@ string fetchResponse(HttpRequest req){
         TRACE(304);
     }
     TRACE("finish adding cache");
-    close(sockFetch);
+
+    
+    string clientAskClose = req.FindHeader("Connection");
+    string serverAskClose = resp.FindHeader("Connection");
+    string cmp = "close";
+    bool whetherClose = false;
+    if ((strcmp(clientAskClose.c_str(), cmp.c_str()) != 0) || (strcmp(serverAskClose.c_str(), cmp.c_str()) != 0) ) {
+        whetherClose = true;
+    }
+    
+    if(whetherClose){
+        close(sockFetch);
+        #ifdef MOREDEBUG
+            cout<<"&&&Finish Fetching Data close remoteFD "<<sockFetch<<endl;
+        #endif
+    }
     return data;
 }
 
 
 
 
-int proxyConnectToRemote(const char *host,const char *port)
+int proxyConnectToRemote(const char *ip, const unsigned short port)
 {
-    struct addrinfo hints, *res;
-    int sock_fd;
-    
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    //fprintf(stderr, "%s %s\n", host, port);
-    int addr_status = getaddrinfo(host, port, &hints, &res);
-    if (addr_status != 0)
+    int sock_fetch = createTCPSocket();
+    int yes = 1;
+    int opt_status = setsockopt(sock_fetch, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+    if (opt_status == -1)
     {
-        fprintf(stderr, "Cannot get info\n");
-        return -1;
+        perror("server: setsockopt");
+        exit(1);
     }
     
-    // Loop through results, connect to first one we can
-    struct addrinfo *p;
-    for (p = res; p != NULL; p = p->ai_next)
-    {
-        // Create the socket
-        sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (sock_fd < 0)
-        {
-            perror("client: cannot open socket");
-            continue;
-        }
-        
-        // Make connection
-        int connect_status = connect(sock_fd, p->ai_addr, p->ai_addrlen);
-        if (connect_status < 0)
-        {
-            close(sock_fd);
-            perror("client: connect");
-            continue;
-        }
-        break;
+    struct sockaddr_in client;
+    client.sin_family = AF_INET;
+    inet_aton(ip, &client.sin_addr);
+    client.sin_addr.s_addr = inet_addr(ip);
+    client.sin_port = port;
+    if(connect(sock_fetch, (struct sockaddr*)&client, sizeof(client))<0){
+      	throw HttpException("502", "Bad Gateway");
     }
     
-    // No binds happened
-    if (p == NULL)
-    {
-        fprintf(stderr, "client: failed to connect\n");
-        return -2;
-    }
-    
-    char s[INET6_ADDRSTRLEN];
-    inet_ntop(p->ai_family, getIPAddr((struct sockaddr *)p->ai_addr), s, sizeof s);
-    // fprintf(stderr, "client: connecting to %s\n", s);
-#ifdef DEBUG
-    printf("proxy: connecting to %s\n", s);
-#endif
-    // Don't need the structure with address info any more
-    freeaddrinfo(res);
-    
-    return sock_fd;
+    return sock_fetch;
 }
 
 
@@ -613,12 +578,18 @@ string getDatafromHost(int remoteFD, HttpResponse* response)
 
 
 
-void *getIPAddr(struct sockaddr *sa)
-{
-	if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+char * get_ip(const char * host){
+	struct hostent *hent;
+	int iplen = 15;
+	char *ip = (char*) malloc(iplen+1);
+	memset(ip,0,iplen+1);
+	if((hent = gethostbyname(host))==NULL){
+		throw HttpException("404","Not found");
+	}
+	if(inet_ntop(AF_INET, (void *)hent->h_addr_list[0],ip,iplen)==NULL){
+		throw HttpException("503","Bad Gateway");
+	}
+	return ip;
 }
 
 
@@ -649,4 +620,15 @@ HttpResponse createErrorMsg(string reason){
     resp.SetStatusCode(code);
     resp.SetStatusMsg(msg);
     return resp;
+}
+
+
+
+int createTCPSocket(){
+    int sock;
+    if((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP))<0){
+        cerr<<"ERROR on accept"<<endl;
+        exit(1);
+    }
+    return sock;
 }
