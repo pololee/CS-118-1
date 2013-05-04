@@ -7,8 +7,8 @@
 #include "http-proxy.h"
 using namespace std;
 
-#define DEBUG 1
-#define MOREDEBUG 1
+//#define DEBUG 1
+//#define MOREDEBUG 1
 
 #ifdef DEBUG
 #define TRACE(x) cout<<x<<endl
