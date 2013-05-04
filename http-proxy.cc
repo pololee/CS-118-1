@@ -7,7 +7,7 @@
 #include "http-proxy.h"
 using namespace std;
 
-//#define DEBUG 1
+#define DEBUG 1
 #define MOREDEBUG 1
 
 #ifdef DEBUG
@@ -25,7 +25,7 @@ pthread_mutex_t count_mutex;
 pthread_cond_t count_threshold;
 pthread_mutex_t cache_mutex;
 int threadCount;
-#define PROXY_SERVER_PORT 48670
+#define PROXY_SERVER_PORT 14805
 #define REMOTE_SERVER_PORT 80
 #define BACKLOG 100
 #define BUFSIZE 2048
@@ -168,12 +168,12 @@ int iniServerListen()
         cerr<<"ERROR on binding"<<endl;
         exit(1);
     }
-    TRACE("bind successful")
+    TRACE("bind successful");
     if(listen(sock_listen,BACKLOG)<0){
         cerr<<"ERROR on listening"<<endl;
         exit(1);
     }
-    TRACE("listen succesful")
+    TRACE("listen succesful");
     
 #ifdef MOREDEBUG
     printf("proxy Port: %d\n", PROXY_SERVER_PORT);
@@ -259,10 +259,6 @@ void* clientToProxy(void * sock)
                 data = rsp.c_str();
                 cout<<"@@DATA received, forward to the client clientFD "<<clientFD<<endl;
                 send(clientFD, data, strlen(data), 0);
-//                string clientAskClose = clientReq.FindHeader("Connection");
-//                if (strcmp("close", clientAskClose.c_str()) != 0) {
-//                    break;
-//                }
             }
             catch (ParseException ex) {
                 TRACE("Parse Exception for RESPONSE");
@@ -446,7 +442,9 @@ string fetchResponse(HttpRequest req){
 
     
     string clientAskClose = req.FindHeader("Connection");
+    cout<<"client ask close "<<clientAskClose<<endl;
     string serverAskClose = resp.FindHeader("Connection");
+    cout<<"server ask close "<<serverAskClose<<endl;
     string cmp = "close";
     bool whetherClose = false;
     if ((strcmp(clientAskClose.c_str(), cmp.c_str()) != 0) || (strcmp(serverAskClose.c_str(), cmp.c_str()) != 0) ) {
