@@ -47,10 +47,6 @@ public:
     
     bool isExpired(){
         time_t now = time(NULL);
-        
-        cout<<"DIFF TIME "<<difftime(expireTime, now)<<endl
-                <<"NOW "<<now<<endl
-                <<"EXPIRE "<<expireTime<<endl;
         if(difftime(expireTime, now)<0){
             return true;
         }

@@ -129,7 +129,8 @@ HttpHeaders::FormatHeaders (char *buffer) const
 void
 HttpHeaders::AddHeader (const std::string &key, const std::string &value)
 {
-  m_headers.push_back (HttpHeader (key, value));
+    string convertKey = boost::to_upper_copy(key);
+  m_headers.push_back (HttpHeader (convertKey, value));
 }
 
 void
@@ -153,7 +154,8 @@ HttpHeaders::ModifyHeader (const std::string &key, const std::string &value)
 std::string
 HttpHeaders::FindHeader (const std::string &key)
 {
-  std::list<HttpHeader>::iterator item = std::find (m_headers.begin (), m_headers.end (), key);
+    string convertKey = boost::to_upper_copy(key);
+  std::list<HttpHeader>::iterator item = std::find (m_headers.begin (), m_headers.end (), convertKey);
   if (item != m_headers.end ())
     return item->m_value;
   else

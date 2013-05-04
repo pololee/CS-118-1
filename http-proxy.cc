@@ -257,7 +257,9 @@ void* clientToProxy(void * sock)
             try {
                 string rsp = getResponse(clientReq);
                 data = rsp.c_str();
+#ifdef MOREDEBUG
                 cout<<"@@DATA received, forward to the client clientFD "<<clientFD<<endl;
+#endif
                 send(clientFD, data, strlen(data), 0);
             }
             catch (ParseException ex) {
@@ -326,7 +328,9 @@ string getResponse(HttpRequest req)
     string url = ss.str();
     
     //Try to get it from cache
+#ifdef MOREDEBUG
     cout<<"url is "<<url<<" ";
+#endif
     TRACE("try to get from cache");
     
     TRACE("CASHE_MUTEX");
@@ -442,9 +446,7 @@ string fetchResponse(HttpRequest req){
 
     
     string clientAskClose = req.FindHeader("Connection");
-    cout<<"client ask close "<<clientAskClose<<endl;
     string serverAskClose = resp.FindHeader("Connection");
-    cout<<"server ask close "<<serverAskClose<<endl;
     string cmp = "close";
     bool whetherClose = false;
     if ((strcmp(clientAskClose.c_str(), cmp.c_str()) != 0) || (strcmp(serverAskClose.c_str(), cmp.c_str()) != 0) ) {
