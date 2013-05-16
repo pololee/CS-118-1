@@ -8,7 +8,7 @@
 using namespace std;
 
 //#define DEBUG 1
-//#define MOREDEBUG 1
+#define MOREDEBUG 1
 
 #ifdef DEBUG
 #define TRACE(x) cout<<x<<endl
